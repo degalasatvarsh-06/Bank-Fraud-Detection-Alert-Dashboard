@@ -1,0 +1,19 @@
+@echo off
+title Bank Fraud Dashboard Launcher
+echo ===================================================
+echo   SECUREBANK - Fraud Incident Control Center
+echo ===================================================
+echo.
+echo Starting Backend Server on http://localhost:5000...
+start "SecureBank Backend Server" cmd /k "cd backend && npm start"
+
+echo Starting Frontend Console on http://localhost:5173...
+start "SecureBank Frontend Console" cmd /k "cd frontend && npm run dev"
+
+echo.
+echo ===================================================
+echo Both servers successfully dispatched in the background!
+echo - Frontend: http://localhost:5173
+echo - Backend:  http://localhost:5000
+echo ===================================================
+pause
