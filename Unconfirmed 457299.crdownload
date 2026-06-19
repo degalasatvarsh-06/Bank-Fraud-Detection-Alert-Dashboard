@@ -1,0 +1,94 @@
+import requests
+import json
+
+# Connection parameters for the SecureBank Fraud Detection server
+API_URL = "http://localhost:5000/api"
+
+def run_demo():
+    print("===================================================")
+    print("   SECUREBANK - Python API Integration Demo")
+    print("===================================================\n")
+    
+    # 1. Authenticate with the REST API
+    print("[1] Authenticating investigator credentials...")
+    login_payload = {
+        "username": "analyst_sarah",
+        "password": "password123"
+    }
+    
+    try:
+        auth_response = requests.post(f"{API_URL}/auth/login", json=login_payload)
+        auth_response.raise_for_status()
+        auth_data = auth_response.json()
+        token = auth_data['token']
+        analyst_name = auth_data['user']['name']
+        print(f"-> Success! Authenticated as: {analyst_name}\n")
+    except Exception as e:
+        print(f"-> Error authenticating: {e}")
+        return
+
+    # Set up headers with JWT token
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    # 2. Fetch the Active Alert Queue
+    print("[2] Fetching active flagged transaction queue...")
+    try:
+        alerts_response = requests.get(f"{API_URL}/alerts", headers=headers)
+        alerts_response.raise_for_status()
+        alerts = alerts_response.json()
+        
+        flagged_alerts = [a for a in alerts if a['status'] == 'Flagged']
+        print(f"-> Found {len(flagged_alerts)} active flagged transaction(s) in queue:\n")
+        
+        for alert in flagged_alerts:
+            print(f"   [{alert['severity'].upper()}] ID: {alert['id']} | Customer: {alert['customerName']}")
+            print(f"   Amount: ${alert['amount']} {alert['currency']} | Merchant: {alert['merchantName']}")
+            print(f"   Flags: {', '.join([f['type'] for f in alert['flags']])}")
+            print("-" * 50)
+        print()
+    except Exception as e:
+        print(f"-> Error fetching alerts: {e}\n")
+        return
+
+    # 3. Simulate Card Block Trigger
+    if flagged_alerts:
+        target_alert = flagged_alerts[0]
+        card_token = target_alert['cardToken']
+        card_number = target_alert['cardNumber']
+        customer = target_alert['customerName']
+        
+        print(f"[3] Triggering card block command for {customer} ({card_number})...")
+        block_payload = {
+            "cardToken": card_token,
+            "action": "Block"
+        }
+        
+        try:
+            block_response = requests.post(f"{API_URL}/cards/block", headers=headers, json=block_payload)
+            block_response.raise_for_status()
+            print(f"-> Success! {block_response.json()['message']}\n")
+        except Exception as e:
+            print(f"-> Error blocking card: {e}\n")
+            
+        # 4. Resolve the transaction as Fraudulent
+        print(f"[4] Resolving Alert {target_alert['id']} as Fraudulent...")
+        resolve_payload = {
+            "status": "Fraudulent",
+            "comments": "Flagged and resolved via Python automated risk daemon."
+        }
+        
+        try:
+            resolve_response = requests.post(f"{API_URL}/alerts/{target_alert['id']}/resolve", headers=headers, json=resolve_payload)
+            resolve_response.raise_for_status()
+            print(f"-> Success! Alert resolved.")
+        except Exception as e:
+            print(f"-> Error resolving alert: {e}\n")
+            
+    else:
+        print("No active alerts in queue to execute block/resolve actions.")
+
+if __name__ == "__main__":
+    run_demo()
